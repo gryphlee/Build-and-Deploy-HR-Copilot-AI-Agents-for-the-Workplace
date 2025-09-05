@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Copilot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #chat-window {
+            height: calc(100vh - 200px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+    <div class="bg-white w-full max-w-2xl mx-4 rounded-2xl shadow-2xl flex flex-col">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-200 rounded-t-2xl bg-gray-50">
+            <h1 class="text-2xl font-bold text-gray-800">HR Copilot</h1>
+            <p class="text-sm text-gray-500 mt-1">Ask me anything about our company policies!</p>
+        </div>
+
+        <!-- Chat Window -->
+        <div id="chat-window" class="p-6 flex-1 overflow-y-auto space-y-4">
+            <!-- Initial Bot Message -->
+            <div class="flex items-start gap-3">
+                <div class="bg-indigo-500 text-white rounded-full h-8 w-8 flex items-center justify-center font-bold text-sm flex-shrink-0">AI</div>
+                <div class="bg-gray-200 text-gray-800 p-3 rounded-lg max-w-md">
+                    <p>Hello! I'm your friendly HR assistant. How can I help you today?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-6 border-t border-gray-200 bg-white rounded-b-2xl">
+            <form id="chat-form" class="flex items-center gap-4">
+                <input type="text" id="user-input" placeholder="Type your question here..." class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition" autocomplete="off">
+                <button type="submit" id="submit-button" class="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:bg-indigo-300">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const chatWindow = document.getElementById('chat-window');
+        const submitButton = document.getElementById('submit-button');
+
+        // The URL for your Flask backend
+        const API_URL = 'http://127.0.0.1:5000/ask';
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userMessage = userInput.value.trim();
+            if (!userMessage) return;
+
+            // Display user's message
+            appendMessage(userMessage, 'user');
+            userInput.value = '';
+            
+            // Show thinking indicator and disable input
+            showThinkingIndicator();
+            userInput.disabled = true;
+            submitButton.disabled = true;
+
+            try {
+                // Send question to the backend
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: userMessage }),
+                });
+
+                // Remove the thinking indicator
+                removeThinkingIndicator();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Display bot's response
+                appendMessage(data.answer || 'Sorry, something went wrong.', 'bot');
+
+            } catch (error) {
+                console.error('Error fetching response:', error);
+                removeThinkingIndicator();
+                appendMessage("I'm having trouble connecting to my brain right now. Please try again later.", 'bot');
+            } finally {
+                // Re-enable input
+                userInput.disabled = false;
+                submitButton.disabled = false;
+                userInput.focus();
+            }
+        });
+
+        function appendMessage(message, sender) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `flex items-start gap-3 ${sender === 'user' ? 'justify-end' : ''}`;
+            
+            let messageHTML;
+
+            if (sender === 'user') {
+                messageHTML = `
+                    <div class="bg-indigo-600 text-white p-3 rounded-lg max-w-md">
+                        <p>${message}</p>
+                    </div>
+                    <div class="bg-gray-300 text-gray-700 rounded-full h-8 w-8 flex items-center justify-center font-bold text-sm flex-shrink-0">You</div>
+                `;
+            } else {
+                messageHTML = `
+                    <div class="bg-indigo-500 text-white rounded-full h-8 w-8 flex items-center justify-center font-bold text-sm flex-shrink-0">AI</div>
+                    <div class="bg-gray-200 text-gray-800 p-3 rounded-lg max-w-md">
+                        <p>${message.replace(/\n/g, '<br>')}</p> <!-- Handle newlines in AI response -->
+                    </div>
+                `;
+            }
+
+            messageWrapper.innerHTML = messageHTML;
+            chatWindow.appendChild(messageWrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll to the bottom
+        }
+        
+        function showThinkingIndicator() {
+            const indicatorWrapper = document.createElement('div');
+            indicatorWrapper.id = 'thinking-indicator';
+            indicatorWrapper.className = 'flex items-start gap-3';
+            indicatorWrapper.innerHTML = `
+                <div class="bg-indigo-500 text-white rounded-full h-8 w-8 flex items-center justify-center font-bold text-sm flex-shrink-0">AI</div>
+                <div class="bg-gray-200 text-gray-800 p-3 rounded-lg max-w-md">
+                    <div class="flex items-center justify-center space-x-1">
+                        <div class="h-2 w-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div class="h-2 w-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div class="h-2 w-2 bg-gray-500 rounded-full animate-bounce"></div>
+                    </div>
+                </div>
+            `;
+            chatWindow.appendChild(indicatorWrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function removeThinkingIndicator() {
+            const indicator = document.getElementById('thinking-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+    </script>
+</body>
+</html>
